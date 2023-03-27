@@ -1,0 +1,18 @@
+version: '3'
+services:
+  nagios:
+    build: ./
+    ports:
+      - '80:80'
+      - '5666:5666'
+      - '443:443'
+    restart: always
+    volumes:
+      - '/gslogs:/gslogs'
+      - '/sys/fs/cgroup:/sys/fs/cgroup:ro'
+      - '/run'
+      - '/mnt/nagios-docker/servers:/usr/local/nagios/etc/servers'
+      - '/mnt/nagios-docker/ssl:/etc/ssl/nagios-ssl'
+      - '/mnt/nagios-docker/.ssh:/home/nagios/.ssh'
+
+

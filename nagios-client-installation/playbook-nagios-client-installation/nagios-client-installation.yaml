@@ -1,0 +1,94 @@
+---
+- hosts: nrpe-clients
+  become: true
+
+
+  tasks:
+  - name: Intsall NRPE Dependencies
+    yum:
+     state: present
+     name:
+      - gcc
+      - glibc 
+      - glibc-common 
+      - openssl 
+      - openssl-devel 
+      - perl 
+      - wget
+      - automake 
+      - autoconf
+  - name: Download files
+    get_url:
+      url: https://github.com/NagiosEnterprises/nrpe/archive/nrpe-4.1.0.tar.gz
+      validate_certs: no
+      dest: /tmp/
+      force: yes
+
+  - name: Download files
+    get_url:
+      url: https://github.com/nagios-plugins/nagios-plugins/archive/release-2.2.1.tar.gz
+      validate_certs: no
+      dest: /tmp/
+      force: yes
+
+  - name: Extract NPRE
+    ansible.builtin.unarchive:
+      src: /tmp/nrpe-nrpe-4.1.0.tar.gz
+      dest: /tmp/
+      remote_src: yes  
+    
+  - name: Extract NPRE Plugins
+    ansible.builtin.unarchive:
+      src: /tmp/nagios-plugins-release-2.2.1.tar.gz
+      dest: /tmp/
+      remote_src: yes  
+     
+  - name: Install NPRE Package
+    command: "{{ item }} chdir=/tmp/nrpe-nrpe-4.1.0"
+    with_items:   
+    - ./configure --enable-command-args
+    - make all  
+    - make install-groups-users
+    - make install
+    - make install-config
+    - make install-init
+  
+  - name: deploy nrpe.cfg   
+    copy:
+      src: nrpe.cfg
+      dest: /usr/local/nagios/etc
+    register: deploy_nrpe
+  
+  - name:  Install NPRE Plugins
+    command: "{{ item }} chdir=/tmp/nagios-plugins-release-2.2.1"
+    with_items:
+    - ./tools/setup
+    - ./configure
+    - make
+    - make install
+
+  - name: Download check_mem file 
+    get_url:
+      url: https://raw.githubusercontent.com/justintime/nagios-plugins/master/check_mem/check_mem.pl
+      validate_certs: no
+      dest: /usr/local/nagios/libexec
+      force: yes
+
+  - name: Changing the folder name
+    command: "{{ item }} chdir=/usr/local/nagios/libexec"
+    with_items:
+    - mv check_mem.pl check_mem
+
+  - name: Changing permission
+    file: dest=/usr/local/nagios/libexec/check_mem mode=a+x
+
+  - name: reload systemd
+    command: systemctl daemon-reload
+
+  - name: start/restart and enable nrpe
+    systemd:
+      name: nrpe
+      state: restarted
+      enabled: yes
+    when: deploy_nrpe.changed
+
